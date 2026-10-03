@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Activity, ArrowRight, LogOut, Search, ShieldCheck, UserCircle2, Download, Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchPatients, updatePatientStatus } from "@/lib/supabase";
+import { verifyAdminPassword } from "@/app/admin/actions";
 
 type Status = "New" | "Contacted" | "Booked" | "Completed";
 
@@ -32,6 +33,10 @@ export function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [filterMode, setFilterMode] = useState<"ALL" | "HOT" | "WARM" | "COLD">("ALL");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   const filteredPatients = useMemo(() => {
     return patients.filter((patient) => {
@@ -70,8 +75,25 @@ export function AdminDashboard() {
       setLoading(false);
     };
 
-    loadPatients();
-  }, []);
+    if (isAuthenticated) {
+      loadPatients();
+    }
+  }, [isAuthenticated]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerifying(true);
+    setAuthError(false);
+    
+    const isValid = await verifyAdminPassword(password);
+    if (isValid) {
+      setIsAuthenticated(true);
+    } else {
+      setAuthError(true);
+      setPassword("");
+    }
+    setVerifying(false);
+  };
 
   const updateStatus = async (id: string, status: Status) => {
     const patient = patients.find((entry) => entry.id === id);
@@ -98,6 +120,43 @@ export function AdminDashboard() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mb-6 flex flex-col items-center justify-center text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <ShieldCheck className="h-8 w-8" />
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-900">Admin Access</h1>
+            <p className="mt-2 text-sm text-slate-500">Please enter the admin password to view patient leads.</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <div>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                autoFocus
+              />
+              {authError && <p className="mt-2 text-sm text-red-500">Incorrect password. Please try again.</p>}
+            </div>
+            <button 
+              type="submit" 
+              disabled={verifying || !password}
+              className="flex w-full items-center justify-center rounded-full bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {verifying ? "Verifying..." : "Login"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-6 lg:p-8">
